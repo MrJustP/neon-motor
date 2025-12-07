@@ -29,6 +29,16 @@
             -webkit-touch-callout: none;
             touch-action: none; 
         }
+        /* DÜZELTME 3: Sağ tık menüsünü engellemek için stil eklendi */
+        body, canvas {
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            -khtml-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            cursor: default;
+        }
 
         /* YÜKLEME EKRANI (Modeller yüklenirken görünür) */
         #loader-overlay {
@@ -237,14 +247,16 @@
 
         const OYUN_AYARLARI = {
             baslangicHizi: 0.5,
-            maksimumHiz: 3.5,
+            maksimumHiz: 1.5,
             trafikYogunlugu: 1.0, 
             kalkanSuresi: 5.0
         };
 
         // --- SİSTEM DEĞİŞKENLERİ ---
         
+        // DİKKAT: BURADAKİ DEĞERLERİ KENDİ FIREBASE PROJENİZİN AYARLARIYLA DEĞİŞTİRMELİSİNİZ!
         const firebaseConfig = {
+            const firebaseConfig = {
             apiKey: "AIzaSyBsyA9O5a6T07619VVr12ET4EAcRqAut7w",
             authDomain: "bitgetmotogp.firebaseapp.com",
             projectId: "bitgetmotogp",
@@ -271,8 +283,16 @@
             crashed: false, nitroTime: 0, shieldTime: 0, distanceTraveled: 0,
             isAuthReady: false // Firebase yetkilendirme durumunu takip etmek için eklendi.
         };
+        // DÜZELTME 1: YATAY SINIR DEĞERİ (Motorun yol dışına çıkmasını engeller)
+        const HORIZONTAL_LIMIT = 4.0; 
         let input = { targetX: 0, isActive: false };
         let db, auth;
+        
+        // DÜZELTME 3: Hile engellemek için sağ tık olayını yakala
+        document.addEventListener('contextmenu', function(e) {
+            e.preventDefault();
+        });
+
 
         // --- AKILLI VARLIK YÖNETİCİSİ ---
         const AssetManager = {
@@ -480,7 +500,8 @@
             const helmet = new THREE.Mesh(new THREE.SphereGeometry(0.22, 16, 16), darkMat); helmet.position.set(0, 1.65, -0.1); group.add(helmet);
 
             setupShield(group);
-            scene.add(group); bike = group;
+            scene.add(group);
+            bike = group;
         }
 
         function setupShield(parentGroup) {
@@ -574,8 +595,8 @@
             gameState.distanceTraveled += speed * 0.1;
 
             if (gameState.baseSpeed < OYUN_AYARLARI.maksimumHiz) { 
-                // Hızlanma oranı: 0.001
-                gameState.baseSpeed = OYUN_AYARLARI.baslangicHizi + Math.min(1.0, gameState.distanceTraveled * 0.001);
+                // DÜZELTME 2: Hızlanma oranını tekrar artırıyoruz (0.001 -> 0.0025)
+                gameState.baseSpeed = OYUN_AYARLARI.baslangicHizi + Math.min(1.0, gameState.distanceTraveled * 0.0025);
             }
 
             if(gameState.shieldTime > 0) {
@@ -599,7 +620,10 @@
             if(roadMesh) roadMesh.material.map.offset.y -= speed * 0.05;
 
             if(bike) {
-                bike.position.x += (input.targetX - bike.position.x) * 0.1;
+                // DÜZELTME 1: Motorun pozisyonunu HORIZONTAL_LIMIT ile sınırlandırıyoruz.
+                const newX = bike.position.x + (input.targetX - bike.position.x) * 0.1;
+                bike.position.x = Math.max(-HORIZONTAL_LIMIT, Math.min(HORIZONTAL_LIMIT, newX));
+                
                 bike.rotation.z = (bike.position.x - input.targetX) * 0.25; 
                 bike.rotation.y = (input.targetX - bike.position.x) * 0.15; 
             }
@@ -640,7 +664,14 @@
         }
 
         function updateScoreText() { document.getElementById('score-text').innerText = gameState.score + " BGB"; }
-        function handleInput(e) { if (!gameState.running || input.isActive || gameState.crashed) return; e.preventDefault(); let cx = e.touches ? e.touches[0].clientX : e.clientX; input.targetX = Math.max(-4, Math.min(4, ((cx / window.innerWidth) * 2 - 1) * 5)); }
+        function handleInput(e) { 
+            if (!gameState.running || input.isActive || gameState.crashed) return; 
+            e.preventDefault(); 
+            let cx = e.touches ? e.touches[0].clientX : e.clientX; 
+            
+            // DÜZELTME 1: Giriş hedef noktasını da yol sınırında tutuyoruz
+            input.targetX = Math.max(-HORIZONTAL_LIMIT, Math.min(HORIZONTAL_LIMIT, ((cx / window.innerWidth) * 2 - 1) * 5)); 
+        }
         function startGame() { document.getElementById('start-screen').style.display = 'none'; gameState.running = true; gameState.crashed = false; gameState.score = 0; gameState.baseSpeed = OYUN_AYARLARI.baslangicHizi; gameState.nitroTime=0; gameState.shieldTime=0; gameState.distanceTraveled=0; updateScoreText(); clock.start(); }
         function gameOver() { gameState.running = false; document.getElementById('final-score').innerText = gameState.score; document.getElementById('game-over-modal').style.display = 'block'; }
         function resetGame() { objects.forEach(o => scene.remove(o)); envObjects.forEach(e => scene.remove(e)); objects = []; envObjects = []; bike.position.x = 0; bike.rotation.set(0,0,0); gameState.running = true; gameState.score = 0; gameState.baseSpeed = OYUN_AYARLARI.baslangicHizi; gameState.nitroTime=0; gameState.shieldTime=0; gameState.distanceTraveled=0; updateScoreText(); document.getElementById('game-over-modal').style.display = 'none'; if(shieldMesh) shieldMesh.visible=false; document.getElementById('shield-status').style.display='none'; }
@@ -649,7 +680,11 @@
 
         // DÜZELTME 2: Firebase Auth başarılı olunca gameState'i güncelliyoruz.
         async function initFirebase() { 
-            if (firebaseConfig.apiKey === "AIzaSyBsyA9O5a6T07619VVr12ET4EAcRqAut7w") return; 
+            // Yapılandırma değerlerinin varsayılan olup olmadığını kontrol et
+            if (firebaseConfig.apiKey === "BURAYA_YAPISTIR") {
+                console.warn("UYARI: Firebase API anahtarları ayarlanmadı. Skor tablosu devre dışı.");
+                return; 
+            } 
             try { 
                 const app = firebase.initializeApp(firebaseConfig);
                 db = firebase.firestore(); 
@@ -673,6 +708,11 @@
         // Skor kaydetme ve skor tablosunu gösterme fonksiyonlarında yetkilendirme kontrolü korunuyor.
         async function saveScoreAndShowLeaderboard() { 
             if(!db || !gameState.isAuthReady) { 
+                // Anahtar ayarlanmamışsa, kullanıcıya net bir uyarı göster.
+                if (firebaseConfig.apiKey === "BURAYA_YAPISTIR") {
+                    alert("Skor kaydedilemiyor. Lütfen Firebase Yapılandırma Anahtarlarını kodda ayarlayın.");
+                    return;
+                }
                 console.error("Veritabanı hazır değil veya yetkilendirme bekleniyor. Lütfen birkaç saniye bekleyip tekrar deneyin.");
                 alert("Veritabanı bağlantısı henüz kurulmadı. Lütfen bekleyip tekrar deneyin.");
                 return; 
@@ -696,7 +736,7 @@
                 showLeaderboardOnly(); 
             } catch(e){
                  console.error("Skor kaydetme hatası:", e);
-                 alert("Skor kaydedilemedi. Firebase ayarlarınızı kontrol edin.");
+                 alert("Skor kaydedilemedi. Firebase ayarlarınızı ve güvenlik kurallarınızı kontrol edin.");
             } 
         }
 
@@ -706,6 +746,10 @@
             l.innerHTML='<li>Yükleniyor...</li>'; 
             
             if(!db || !gameState.isAuthReady) { 
+                if (firebaseConfig.apiKey === "BURAYA_YAPISTIR") {
+                     l.innerHTML = '<li>Skor tablosu yapılandırılmadı. Firebase Anahtarlarını ayarlayın.</li>';
+                    return;
+                }
                 l.innerHTML = '<li>Veritabanı bağlantısı veya yetkilendirme bekleniyor. Lütfen bekleyip tekrar deneyin.</li>';
                 return; 
             } 
@@ -729,7 +773,7 @@
                 }); 
             } catch (e) {
                 console.error("Lider tablosu yüklenemedi:", e);
-                l.innerHTML = '<li>Skorlar yüklenirken bir hata oluştu.</li>';
+                l.innerHTML = '<li>Skorlar yüklenirken bir hata oluştu. Güvenlik kurallarınızı kontrol edin.</li>';
             }
         }
 
