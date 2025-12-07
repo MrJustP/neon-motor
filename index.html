@@ -9,13 +9,12 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     
-    <!-- Firebase SDKs (Compat version for simplicity in standalone files) -->
+    <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
 
     <style>
-        /* --- CSS KATMANI --- */
         body {
             margin: 0;
             overflow: hidden;
@@ -166,14 +165,11 @@
     </style>
 </head>
 <body>
-
-    <!-- UI KATMANI -->
     <div id="ui-container">
         <div id="score-board">BGB: 0</div>
         <div id="shield-status">🛡️ KALKAN</div>
     </div>
 
-    <!-- Başlangıç Ekranı -->
     <div id="start-screen" class="modal" style="display: flex;">
         <h1 class="game-title">Bitget X Moto GP</h1>
         <div class="legend" style="color: #00ff00;">🟢 PUMP: +%10 Skor</div>
@@ -183,7 +179,6 @@
         <button class="big-btn" id="btn-start">BAŞLA</button>
     </div>
 
-    <!-- Oyun Sonu Ekranı -->
     <div id="game-over-modal" class="modal">
         <h1 style="color: #ff0055; margin: 0;">REKT!</h1>
         <p>Skor: <span id="final-score">0</span> BGB</p>
@@ -209,19 +204,15 @@
         <div id="loading">Bağlanıyor...</div>
     </div>
 
-    <!-- Liderlik Tablosu -->
     <div id="leaderboard-modal" class="modal">
         <h2 style="color: #ffd700;">🏆 LİDERLER 🏆</h2>
         <ul id="leaderboard-list"></ul>
         <button class="secondary" id="btn-close-leaderboard">KAPAT</button>
     </div>
 
-    <!-- OYUN MANTIĞI (JS) -->
     <script>
     (function() {
-        // ==========================================
         // GÜVENLİK
-        // ==========================================
         document.addEventListener('contextmenu', event => event.preventDefault());
         document.addEventListener('keydown', function(e) {
             if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && e.key === 'I')) {
@@ -229,26 +220,17 @@
             }
         });
 
-        // ==========================================
-        // 1. AYARLAR (BURASI ÇOK ÖNEMLİ)
-        // ==========================================
-        
-        // GEMINI API KEY (İsteğe bağlı, AI yorumu için)
-        const GEMINI_API_KEY = ""; // Buraya Gemini API Key gelecek
-
-        /* 🔥 ÖNEMLİ: FIREBASE AYARLARI 🔥
-           Kendi Firebase konsolundan aldığın bilgileri buraya yapıştırmalısın.
-           Eğer burası boş kalırsa skor kaydedilmez.
-        */
+        // 1. AYARLAR
+        const GEMINI_API_KEY = ""; 
         const firebaseConfig = {
-            apiKey: "AIzaSyBsyA9O5a6T07619VVr12ET4EAcRqAut7w",
-            authDomain: "bitgetmotogp.firebaseapp.com",
-            projectId: "bitgetmotogp",
-            storageBucket: "bitgetmotogp.firebasestorage.app",
-            messagingSenderId: "331050563966",
-            appId: "G-EB4DNJ9P21"
+            apiKey: "BURAYA_YAPISTIR",
+            authDomain: "BURAYA_YAPISTIR",
+            projectId: "BURAYA_YAPISTIR",
+            storageBucket: "BURAYA_YAPISTIR",
+            messagingSenderId: "BURAYA_YAPISTIR",
+            appId: "BURAYA_YAPISTIR"
         };
-        // ------------------------------------------------------------------
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'neon-motor-game';
 
         const COLORS = { CYAN: 0x00ffff, RED: 0xff0055, GREEN: 0x00ff00, BLUE: 0x0088ff };
         let scene, camera, renderer, clock;
@@ -261,7 +243,6 @@
         let db, auth;
         const textureLoader = new THREE.TextureLoader();
 
-        // --- BAŞLATMA ---
         window.onload = function() {
             bindEvents();
             initTelegram();
@@ -277,7 +258,6 @@
             safeAddClick('btn-share', shareToTelegram);
             safeAddClick('btn-reset', resetGame);
             safeAddClick('btn-close-leaderboard', closeLeaderboard);
-            
             const nameInput = document.getElementById('player-name');
             if(nameInput) {
                 nameInput.addEventListener('focus', () => { input.isActive = true; });
@@ -289,18 +269,48 @@
             if(el) el.addEventListener('click', func);
         }
 
-        // --- ASSET MANAGER ---
+        /* =================================================================
+           GÖRSEL YÖNETİCİSİ (ASSET MANAGER)
+           ================================================================= */
         const AssetManager = {
-            getLogo: function() { return this.createProceduralTexture('logo'); },
-            getCoin: function() { return this.createProceduralTexture('coin'); },
-            getPump: function() { return this.createProceduralTexture('pump'); },
-            getDump: function() { return this.createProceduralTexture('dump'); },
+            getBike: function() {
+                // ---> 0. MOTOR GÖRSELİ (TEK PARÇA)
+                // 'assets/bike.png' dosyasını kullanmak için alttaki satırı aç:
+                // return textureLoader.load('assets/bike.png');
+                
+                // Varsayılan: Kod ile çizilen basit bir motor arkası görüntüsü
+                return this.createProceduralTexture('bike');
+            },
+            getLogo: function() {
+                // ---> 1. Logo: 'assets/logo.png' kullanmak için aç:
+                // return textureLoader.load('assets/logo.png');
+                return this.createProceduralTexture('logo');
+            },
+            getCoin: function() {
+                // ---> 2. Coin: 'assets/coin.png' kullanmak için aç:
+                // return textureLoader.load('assets/coin.png');
+                return this.createProceduralTexture('coin');
+            },
+            getPump: function() {
+                // return textureLoader.load('assets/pump.png');
+                return this.createProceduralTexture('pump');
+            },
+            getDump: function() {
+                // return textureLoader.load('assets/dump.png');
+                return this.createProceduralTexture('dump');
+            },
             createProceduralTexture: function(type) {
                 const canvas = document.createElement('canvas');
                 canvas.width = 128; canvas.height = 128;
                 const ctx = canvas.getContext('2d');
                 const cx = 64, cy = 64;
-                if (type === 'logo') {
+                if (type === 'bike') {
+                    // Basit bir motor arkası çizimi (Placeholder)
+                    canvas.width = 128; canvas.height = 128;
+                    ctx.fillStyle = '#111'; ctx.fillRect(40, 60, 48, 60); // Teker
+                    ctx.fillStyle = '#00ffff'; ctx.fillRect(30, 20, 68, 40); // Gövde
+                    ctx.fillStyle = '#ff0055'; ctx.beginPath(); ctx.arc(64, 40, 10, 0, Math.PI*2); ctx.fill(); // Stop lambası
+                } else if (type === 'logo') {
                     canvas.width = 256; canvas.height = 64;
                     ctx.fillStyle = '#004444'; ctx.fillRect(0,0,256,64);
                     ctx.strokeStyle = '#00ffff'; ctx.lineWidth = 4; ctx.strokeRect(0,0,256,64);
@@ -322,7 +332,6 @@
             }
         };
 
-        // --- THREE JS ---
         function initThreeJS() {
             clock = new THREE.Clock();
             scene = new THREE.Scene();
@@ -353,27 +362,35 @@
             window.addEventListener('resize', onWindowResize);
         }
 
+        // --- YENİ BASİTLEŞTİRİLMİŞ MOTOR OLUŞTURMA ---
         function createBike() {
             if(bike) scene.remove(bike);
             bike = new THREE.Group();
-            const matBody = new THREE.MeshPhongMaterial({ color: COLORS.CYAN, emissive: 0x001111, shininess: 100 });
-            const matDark = new THREE.MeshPhongMaterial({ color: 0x111111 });
-            const body = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.4, 1.2), matBody); body.position.y = 0.5; bike.add(body);
-            const handleBar = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.6), matDark);
-            handleBar.rotation.z = Math.PI / 2; handleBar.position.set(0, 0.8, -0.3); bike.add(handleBar);
-            const riderBody = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.5, 0.3), matBody);
-            riderBody.position.set(0, 0.8, 0); riderBody.rotation.x = 0.3; bike.add(riderBody);
-            const riderHead = new THREE.Mesh(new THREE.SphereGeometry(0.18, 16, 16), matBody);
-            riderHead.position.set(0, 1.15, -0.1); bike.add(riderHead);
-            const wheelGeo = new THREE.TorusGeometry(0.3, 0.1, 16, 16);
-            const w1 = new THREE.Mesh(wheelGeo, matDark); w1.rotation.y = Math.PI/2; w1.position.set(0, 0.3, 0.7);
-            const w2 = w1.clone(); w2.position.set(0, 0.3, -0.7); bike.add(w1); bike.add(w2);
-            const logoTex = AssetManager.getLogo();
-            const logo = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.2), new THREE.MeshBasicMaterial({ map: logoTex, transparent: true }));
-            logo.position.set(-0.26, 0.5, 0); logo.rotation.y = -Math.PI / 2; bike.add(logo);
-            const logo2 = logo.clone(); logo2.position.set(0.26, 0.5, 0); logo2.rotation.y = Math.PI / 2; logo2.scale.x = -1; bike.add(logo2);
-            shieldMesh = new THREE.Mesh(new THREE.SphereGeometry(1.3, 32, 32), new THREE.MeshBasicMaterial({ color: COLORS.BLUE, transparent: true, opacity: 0.3, wireframe: true }));
-            shieldMesh.visible = false; shieldMesh.position.y = 0.6; bike.add(shieldMesh);
+
+            // 1. Motor Görselini Al (AssetManager'dan)
+            const bikeTexture = AssetManager.getBike();
+
+            // 2. Tek bir düzlem (Plane) üzerine resmi yapıştır
+            // Eğer resminiz kare değilse buradaki 1.5, 1.5 oranını değiştirebilirsiniz (örn: 1.0, 2.0)
+            const geometry = new THREE.PlaneGeometry(1.5, 1.5);
+            const material = new THREE.MeshBasicMaterial({ 
+                map: bikeTexture, 
+                transparent: true, 
+                side: THREE.DoubleSide
+            });
+            
+            const bikeMesh = new THREE.Mesh(geometry, material);
+            // Resmi dik değil, hafif eğik veya tam arkadan görünecek şekilde ayarlayabiliriz
+            // Şu an kameraya bakacak şekilde ayarlıyoruz (Sprite mantığı ama 3D obje olarak)
+            bikeMesh.position.y = 0.75; 
+            // bikeMesh.rotation.y = Math.PI; // Eğer resim ters ise bunu açın
+            
+            bike.add(bikeMesh);
+
+            // Kalkan efekti (Motorun etrafında)
+            shieldMesh = new THREE.Mesh(new THREE.SphereGeometry(1.0, 32, 32), new THREE.MeshBasicMaterial({ color: COLORS.BLUE, transparent: true, opacity: 0.3, wireframe: true }));
+            shieldMesh.visible = false; shieldMesh.position.y = 0.75; bike.add(shieldMesh);
+            
             scene.add(bike);
         }
 
@@ -447,7 +464,10 @@
             if (!gameState.running || input.isActive || gameState.crashed) return;
             e.preventDefault();
             let cx = e.touches ? e.touches[0].clientX : e.clientX;
-            input.targetX = Math.max(-3, Math.min(3, ((cx / window.innerWidth) * 2 - 1) * 3.5));
+            // DÜZELTME: Mobilde motorun ekran dışına çıkmasını engellemek için sınırlandırma (Clamp)
+            let normalized = (cx / window.innerWidth) * 2 - 1;
+            // Sınırları -2.5 ile 2.5 arasına sabitliyoruz
+            input.targetX = Math.max(-2.5, Math.min(2.5, normalized * 3.5));
         }
 
         function startGame() {
@@ -485,7 +505,6 @@
         function updateScoreUI() { document.getElementById('score-board').innerText = 'BGB: ' + gameState.score; }
         function onWindowResize() { camera.aspect = window.innerWidth/window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); }
 
-        // --- ENTEGRASYONLAR ---
         function initTelegram() {
             if (window.Telegram?.WebApp) {
                 const tg = window.Telegram.WebApp; tg.ready(); tg.expand();
@@ -496,7 +515,6 @@
         }
         
         async function initFirebase() {
-            // Kontrol: Kullanıcı config'i doldurmuş mu?
             if (firebaseConfig.apiKey === "BURAYA_YAPISTIR") {
                 console.warn("Firebase ayarları yapılmamış!");
                 return;
@@ -506,7 +524,6 @@
                 db = firebase.firestore();
                 auth = firebase.auth();
                 await auth.signInAnonymously();
-                console.log("Firebase bağlantısı başarılı!");
             } catch(e) { console.error("Firebase hatası:", e); }
         }
 
