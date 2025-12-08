@@ -8,14 +8,21 @@
     <!-- HARİCİ KÜTÜPHANELER -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     
-    <!-- HATA DÜZELTME 1: GLTFLoader hatasını önlemek için güvenilir CDN'e geçildi -->
+    <!-- HATA DÜZELTME 2: GLTFLoader için tekrar cdnjs'e ve THREE.js'in standart examples dizinine döndü. -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
     
     <!-- Firebase SDKs (Bunlar global yüklenmeye devam edebilir) -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    
+    <!-- DİKKAT: Firestore hata ayıklama için log seviyesi ayarlandı -->
+    <script>
+        if (typeof firebase !== 'undefined' && firebase.firestore) {
+            firebase.firestore.setLogLevel('debug');
+        }
+    </script>
 
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;700;900&display=swap');
@@ -254,15 +261,15 @@
 
         // --- SİSTEM DEĞİŞKENLERİ ---
         
-        // DİKKAT: BURADAKİ DEĞERLERİ KENDİ FIREBASE PROJENİZİN AYARLARIYLA DEĞİŞTİRMELİSİNİZ!
+        // KULLANICIDAN ALINAN GERÇEK FIREBASE YAPILANDIRMASI
         const firebaseConfig = {
-            const firebaseConfig = {
             apiKey: "AIzaSyBsyA9O5a6T07619VVr12ET4EAcRqAut7w",
             authDomain: "bitgetmotogp.firebaseapp.com",
             projectId: "bitgetmotogp",
             storageBucket: "bitgetmotogp.firebasestorage.app",
-            messagingSenderId: "bitgetmotogp.firebasestorage.app",
-            appId: "G-EB4DNJ9P21"
+            messagingSenderId: "331050563966",
+            appId: "1:331050563966:web:2f21e7f282d0b478021b2f",
+            measurementId: "G-EB4DNJ9P21" 
         };
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'neon-motor-game';
 
@@ -595,7 +602,7 @@
             gameState.distanceTraveled += speed * 0.1;
 
             if (gameState.baseSpeed < OYUN_AYARLARI.maksimumHiz) { 
-                // DÜZELTME 2: Hızlanma oranını tekrar artırıyoruz (0.001 -> 0.0025)
+                // Hızlanma oranı: 0.0025
                 gameState.baseSpeed = OYUN_AYARLARI.baslangicHizi + Math.min(1.0, gameState.distanceTraveled * 0.0025);
             }
 
@@ -678,49 +685,57 @@
         function onWindowResize() { camera.aspect = window.innerWidth/window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); }
         function initTelegram() { if (window.Telegram?.WebApp) { const tg = window.Telegram.WebApp; tg.ready(); tg.expand(); if(tg.initDataUnsafe?.user?.first_name) { const inp = document.getElementById('player-name'); if(inp) inp.value = tg.initDataUnsafe.user.first_name; } } }
 
-        // DÜZELTME 2: Firebase Auth başarılı olunca gameState'i güncelliyoruz.
+        // DÜZELTME 1: Token hatasını yönetmek için signInWithCustomToken etrafına try/catch bloğu ekleniyor ve hatada anonim girişe geçiliyor.
         async function initFirebase() { 
-            // Yapılandırma değerlerinin varsayılan olup olmadığını kontrol et
-            if (firebaseConfig.apiKey === "BURAYA_YAPISTIR") {
-                console.warn("UYARI: Firebase API anahtarları ayarlanmadı. Skor tablosu devre dışı.");
-                return; 
-            } 
+            
             try { 
                 const app = firebase.initializeApp(firebaseConfig);
-                db = firebase.firestore(); 
-                auth = firebase.auth(); 
+                // Firebase servislerini uygulamadan al
+                db = firebase.firestore(app); 
+                auth = firebase.auth(app); 
 
-                // Canvas ortamında token varsa kullan, yoksa anonim giriş yap.
+                // Canvas ortamından gelen token
                 const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+                
+                let signedIn = false;
                 if (initialAuthToken) {
-                    await auth.signInWithCustomToken(initialAuthToken);
-                } else {
+                    try {
+                        // Özel token ile giriş yapmayı dene
+                        await auth.signInWithCustomToken(initialAuthToken);
+                        signedIn = true;
+                        console.log("Firebase: Özel token ile giriş başarılı.");
+                    } catch (tokenError) {
+                        // Eğer token eşleşmeme hatası (custom-token-mismatch) alırsak veya başka bir hata olursa...
+                        console.warn("Firebase Uyarısı: Özel token ile giriş başarısız oldu. Anonim giriş deneniyor.", tokenError.code);
+                    }
+                }
+                
+                // Eğer özel token ile giriş yapılmadıysa, anonim giriş yap
+                if (!signedIn) {
                     await auth.signInAnonymously();
+                    console.log("Firebase: Anonim giriş başarılı.");
                 }
                 
                 gameState.isAuthReady = true; // Yetkilendirme tamamlandı.
                 console.log("Firebase Yetkilendirmesi Başarılı. Skor Kaydı Aktif.");
             } catch(e) { 
                 console.error("Firebase başlatma veya kimlik doğrulama hatası:", e); 
+                // Yetkilendirme başarısız olursa isAuthReady false kalır ve bu, skoru kaydetme fonksiyonlarında yönetilir.
             } 
         }
 
         // Skor kaydetme ve skor tablosunu gösterme fonksiyonlarında yetkilendirme kontrolü korunuyor.
         async function saveScoreAndShowLeaderboard() { 
             if(!db || !gameState.isAuthReady) { 
-                // Anahtar ayarlanmamışsa, kullanıcıya net bir uyarı göster.
-                if (firebaseConfig.apiKey === "BURAYA_YAPISTIR") {
-                    alert("Skor kaydedilemiyor. Lütfen Firebase Yapılandırma Anahtarlarını kodda ayarlayın.");
-                    return;
-                }
-                console.error("Veritabanı hazır değil veya yetkilendirme bekleniyor. Lütfen birkaç saniye bekleyip tekrar deneyin.");
-                alert("Veritabanı bağlantısı henüz kurulmadı. Lütfen bekleyip tekrar deneyin.");
+                console.error("Veritabanı hazır değil veya yetkilendirme bekleniyor. (Firebase başlatma başarısız olmuş olabilir)");
+                alert("Veritabanı bağlantısı henüz kurulmadı veya başarısız oldu. Lütfen tekrar deneyin ve konsolu kontrol edin.");
                 return; 
             } 
             const n=document.getElementById('player-name').value||"Trader"; 
             
             // Kullanıcı kimliğini al
-            const userId = auth.currentUser ? auth.currentUser.uid : 'anon_user';
+            // auth.currentUser'ın null/anonim olma ihtimaline karşı kontrol
+            const userId = auth.currentUser ? auth.currentUser.uid : 'anon_guest';
 
             try{ 
                 // Public veri yolu: /artifacts/{appId}/public/data/leaderboard
@@ -736,7 +751,7 @@
                 showLeaderboardOnly(); 
             } catch(e){
                  console.error("Skor kaydetme hatası:", e);
-                 alert("Skor kaydedilemedi. Firebase ayarlarınızı ve güvenlik kurallarınızı kontrol edin.");
+                 alert("Skor kaydedilemedi. Firestore güvenlik kurallarınızı kontrol edin.");
             } 
         }
 
@@ -746,10 +761,6 @@
             l.innerHTML='<li>Yükleniyor...</li>'; 
             
             if(!db || !gameState.isAuthReady) { 
-                if (firebaseConfig.apiKey === "BURAYA_YAPISTIR") {
-                     l.innerHTML = '<li>Skor tablosu yapılandırılmadı. Firebase Anahtarlarını ayarlayın.</li>';
-                    return;
-                }
                 l.innerHTML = '<li>Veritabanı bağlantısı veya yetkilendirme bekleniyor. Lütfen bekleyip tekrar deneyin.</li>';
                 return; 
             } 
